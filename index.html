@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>ESP32 MQTT Simulator — RAIL</title>
+<link rel="icon" type="image/png" href="https://jurnudev.github.io/my-assets/logo.png.jpeg">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.3.5/mqtt.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0e1a;--bg2:#111827;--bg3:#1a2236;--bg4:#0d1525;
+  --bd:#2a3a5c;--bd2:#3a4a6c;
+  --tx:#e8edf5;--tx2:#8899b8;--tx3:#4a5f8a;
+  --gn:#10b981;--gd:rgba(16,185,129,.12);
+  --rd:#ef4444;--rm:rgba(239,68,68,.12);
+  --am:#f59e0b;--adm:rgba(245,158,11,.12);
+  --bl:#3b82f6;--bm:rgba(59,130,246,.12);
+  --pu:#8b5cf6;--pm:rgba(139,92,246,.12);
+  --cy:#06b6d4;
+  --mo:'JetBrains Mono',monospace;
+  --sa:'Sarabun',sans-serif;
+}
+body.light{
+  --bg:#f0f4f8;--bg2:#ffffff;--bg3:#e8eef5;--bg4:#dde5f0;
+  --bd:#b8c8dc;--bd2:#a0b4cc;
+  --tx:#0f1c2e;--tx2:#2d4a6e;--tx3:#6080a0;
+  --gd:rgba(16,185,129,.15);--rm:rgba(239,68,68,.15);
+  --adm:rgba(245,158,11,.15);--bm:rgba(59,130,246,.15);--pm:rgba(139,92,246,.15);
+}
+/* Theme toggle button */
+.theme-btn{background:var(--bg3);border:1px solid var(--bd);color:var(--tx2);border-radius:8px;padding:4px 10px;cursor:pointer;font-family:var(--mo);font-size:11px;font-weight:700;transition:all .25s;display:flex;align-items:center;gap:5px;white-space:nowrap;}
+.theme-btn:hover{border-color:var(--bl);color:var(--bl);}
+/* Publish mode buttons */
+.pub-mode-grp{display:flex;gap:5px;margin-bottom:8px;}
+.pmb{flex:1;font-family:var(--mo);font-size:9px;font-weight:700;padding:7px 4px;border-radius:7px;border:1px solid var(--bd);cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:var(--bg4);color:var(--tx3);text-transform:uppercase;letter-spacing:.5px;line-height:1.2;}
+.pmb .pmbico{font-size:14px;}
+.pmb:hover{transform:translateY(-1px);border-color:var(--bl);color:var(--bl);}
+.pmb:active{transform:scale(.96);}
+.pmb.active-rand{background:linear-gradient(135deg,var(--am),#d97706);color:#fff;border-color:transparent;box-shadow:0 3px 10px rgba(245,158,11,.3);}
+.pmb.active-slide{background:linear-gradient(135deg,var(--bl),var(--cy));color:#fff;border-color:transparent;box-shadow:0 3px 10px rgba(59,130,246,.3);}
+.pmb.active-off{background:linear-gradient(135deg,var(--rd),#dc2626);color:#fff;border-color:transparent;box-shadow:0 3px 10px rgba(239,68,68,.3);}
+/* pub mode badge on dashboard cards */
+.pub-badge{font-family:var(--mo);font-size:8px;padding:1px 5px;border-radius:4px;border:1px solid;font-weight:700;}
+.pb-rand{background:rgba(245,158,11,.15);color:var(--am);border-color:rgba(245,158,11,.4);}
+.pb-slide{background:rgba(59,130,246,.15);color:var(--bl);border-color:rgba(59,130,246,.4);}
+.pb-off{background:rgba(239,68,68,.15);color:var(--rd);border-color:rgba(239,68,68,.4);}
+.pb-auto{background:var(--gd);color:var(--gn);border-color:rgba(16,185,129,.4);}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:var(--sa);background:var(--bg);color:var(--tx);font-size:13px;}
+
+/* ── TOPBAR ── */
+#topbar{background:var(--bg2);border-bottom:1px solid var(--bd);padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:48px;position:sticky;top:0;z-index:100;}
+.logo-wrap{display:flex;align-items:center;gap:10px;}
+.logo-img{width:30px;height:30px;border-radius:7px;object-fit:contain;}
+.logo-title{font-family:var(--mo);font-weight:700;font-size:13px;color:var(--tx);}
+.logo-sub{font-size:9px;color:var(--tx3);letter-spacing:2px;text-transform:uppercase;}
+.badge{font-family:var(--mo);font-size:9px;padding:2px 10px;border-radius:99px;border:1px solid;font-weight:600;letter-spacing:.5px;}
+.b-board{background:var(--bm);color:var(--bl);border-color:rgba(59,130,246,.4);}
+.b-ok{background:var(--gd);color:var(--gn);border-color:rgba(16,185,129,.4);}
+.b-err{background:var(--rm);color:var(--rd);border-color:rgba(239,68,68,.4);}
+.tr{display:flex;align-items:center;gap:8px;}
+.dot{width:8px;height:8px;border-radius:50%;transition:all .3s;flex-shrink:0;}
+.dot.off{background:#2a3a5c;}
+.dot.g{background:var(--gn);box-shadow:0 0 8px rgba(16,185,129,.6);}
+.dot.r{background:var(--rd);box-shadow:0 0 8px rgba(239,68,68,.6);}
+.dot.y{background:var(--am);box-shadow:0 0 8px rgba(245,158,11,.6);}
+.dlb{font-family:var(--mo);font-size:9px;color:var(--tx3);}
+@keyframes pulseG{0%,100%{box-shadow:0 0 8px rgba(16,185,129,.6)}50%{box-shadow:0 0 14px rgba(16,185,129,.9)}}
+.dot.g{animation:pulseG 2s infinite;}
+
+/* ── LAYOUT ── */
+#layout{display:grid;grid-template-columns:270px 1fr;height:calc(100vh - 48px);}
+
+/* ── SIDEBAR ── */
+#sb{background:var(--bg2);border-right:1px solid var(--bd);overflow-y:auto;display:flex;flex-direction:column;}
+.ss{border-bottom:1px solid var(--bd);padding:12px 14px;}
+.stt{font-family:var(--mo);font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:var(--tx3);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.stt .icon{width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;}
+label{display:block;font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:var(--tx3);margin-bottom:3px;font-family:var(--mo);font-weight:600;}
+input[type=text],input[type=number],input[type=password]{
+  width:100%;background:var(--bg4);border:1px solid var(--bd);color:var(--tx);
+  font-family:var(--mo);font-size:11px;padding:6px 9px;border-radius:7px;margin-bottom:8px;
+  outline:none;transition:all .3s;
+}
+input:focus{border-color:var(--bl);box-shadow:0 0 0 3px rgba(59,130,246,.1);}
+.btn{font-family:var(--mo);font-size:10px;font-weight:700;padding:7px 13px;border-radius:7px;border:none;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;text-transform:uppercase;letter-spacing:.8px;}
+.btn:hover{transform:translateY(-1px);filter:brightness(1.1);}
+.btn:active{transform:scale(.97);}
+.btn.g{background:linear-gradient(135deg,var(--gn),#059669);color:#fff;box-shadow:0 3px 10px rgba(16,185,129,.25);}
+.btn.r{background:linear-gradient(135deg,var(--rd),#dc2626);color:#fff;}
+.btn.b{background:linear-gradient(135deg,var(--bl),var(--cy));color:#fff;box-shadow:0 3px 10px rgba(59,130,246,.25);}
+.btn.a{background:linear-gradient(135deg,var(--am),#d97706);color:#fff;}
+.btn.gr{background:var(--bg3);color:var(--tx2);border:1px solid var(--bd);}
+.btn.gr:hover{border-color:var(--bl);color:var(--bl);}
+.btn.p{background:linear-gradient(135deg,var(--pu),#7c3aed);color:#fff;}
+.fw{width:100%;margin-bottom:6px;}
+input[type=range]{width:100%;accent-color:var(--bl);margin:3px 0 8px;cursor:pointer;}
+.trow{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;}
+.tlb{font-family:var(--mo);font-size:10px;color:var(--tx2);}
+.tog{width:30px;height:16px;background:var(--bd);border-radius:8px;position:relative;cursor:pointer;border:1px solid var(--bd2);flex-shrink:0;transition:background .2s;}
+.tog.on{background:rgba(16,185,129,.3);border-color:rgba(16,185,129,.5);}
+.tog::after{content:'';width:10px;height:10px;background:var(--tx3);border-radius:50%;position:absolute;top:2px;left:2px;transition:all .2s;}
+.tog.on::after{left:16px;background:var(--gn);}
+.gr2{display:flex;gap:7px;margin-bottom:8px;}
+.ga{flex:1;background:var(--bg4);border:1px solid var(--bd);border-radius:7px;padding:7px;text-align:center;}
+.gv{font-family:var(--mo);font-size:20px;font-weight:700;line-height:1;}
+.gu{font-size:10px;color:var(--tx2);margin-top:1px;}
+.gl{font-size:9px;color:var(--tx3);margin-top:3px;font-family:var(--mo);text-transform:uppercase;letter-spacing:1px;}
+
+/* OLED */
+.oled{background:#030a03;border:2px solid #0a1a0a;border-radius:5px;padding:6px 8px;font-family:var(--mo);font-size:9.5px;color:#00e600;line-height:1.8;margin-bottom:8px;min-height:70px;overflow:hidden;position:relative;}
+.oled::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,200,0,.01) 2px,rgba(0,200,0,.01) 4px);pointer-events:none;z-index:0;}
+.oled>*{position:relative;z-index:1;}
+.ol{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+/* LED BULBS */
+.bulbs{display:flex;gap:12px;justify-content:center;margin-bottom:10px;}
+.bwrap{display:flex;flex-direction:column;align-items:center;gap:4px;}
+.bulb{width:42px;height:42px;border-radius:50%;border:2px solid #1a2236;background:radial-gradient(circle at 35% 35%,#1a2236,#0a0e1a);transition:all .3s;}
+.bulb.oa{background:radial-gradient(circle at 35% 35%,#ffe566,#cc8800);border-color:#ffcc00;box-shadow:0 0 20px 6px rgba(255,204,0,.45);}
+.bulb.ob{background:radial-gradient(circle at 35% 35%,#60a5fa,#1d4ed8);border-color:#3b82f6;box-shadow:0 0 20px 6px rgba(59,130,246,.45);}
+.bulb.oc{background:radial-gradient(circle at 35% 35%,#4ade80,#16a34a);border-color:#22c55e;box-shadow:0 0 20px 6px rgba(34,197,94,.45);}
+.blb{font-family:var(--mo);font-size:11px;color:var(--tx2);font-weight:600;}
+.bst{font-family:var(--mo);font-size:9px;color:var(--tx3);text-transform:uppercase;letter-spacing:1px;}
+
+/* GPIO */
+.gpg{display:grid;grid-template-columns:1fr 1fr;gap:2px;}
+.pin{display:flex;align-items:center;gap:4px;padding:3px;}
+.pdot{width:6px;height:6px;border-radius:50%;background:var(--bd);border:1px solid var(--bd2);flex-shrink:0;transition:all .3s;}
+.pdot.h{background:var(--gn);box-shadow:0 0 5px rgba(16,185,129,.6);border-color:var(--gn);}
+.pdot.adc{background:var(--bl);border-color:var(--bl);}
+.pn{color:var(--tx3);font-size:8.5px;font-family:var(--mo);}
+.pv{color:var(--tx2);font-size:8.5px;margin-left:auto;font-family:var(--mo);}
+
+/* ── MAIN ── */
+#main{display:flex;flex-direction:column;overflow:hidden;}
+#tabbar{background:var(--bg2);border-bottom:1px solid var(--bd);display:flex;padding:0 14px;}
+.tab{font-family:var(--mo);font-size:10px;padding:11px 14px;cursor:pointer;color:var(--tx3);border-bottom:2px solid transparent;transition:all .2s;display:flex;align-items:center;gap:5px;text-transform:uppercase;letter-spacing:.5px;font-weight:600;}
+.tab:hover{color:var(--tx2);}
+.tab.on{color:var(--bl);border-bottom-color:var(--bl);}
+.tct{background:var(--bd);color:var(--tx3);font-size:9px;padding:1px 6px;border-radius:8px;}
+.tc{display:none;flex:1;overflow:hidden;}
+.tc.on{display:flex;flex-direction:column;}
+
+/* DASHBOARD */
+.dash{padding:12px;overflow-y:auto;flex:1;display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:10px;align-content:start;}
+.card{background:var(--bg3);border:1px solid var(--bd);border-radius:10px;padding:12px;transition:all .3s;}
+.card:hover{border-color:var(--bd2);}
+.card.fl{border-color:rgba(16,185,129,.5);background:rgba(16,185,129,.04);}
+.ch{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;}
+.ctop{font-family:var(--mo);font-size:9px;color:var(--tx3);background:var(--bg4);padding:2px 6px;border-radius:4px;border:1px solid var(--bd);}
+.cv{font-family:var(--mo);font-size:26px;font-weight:700;line-height:1;margin-bottom:3px;word-break:break-all;}
+.cd{font-size:10px;color:var(--tx3);}
+.ctm{font-family:var(--mo);font-size:9px;color:var(--tx3);margin-top:5px;}
+.sbw{margin-top:7px;height:3px;background:var(--bd);border-radius:2px;overflow:hidden;}
+.sbf{height:100%;border-radius:2px;transition:width .5s ease;}
+.cw{grid-column:span 2;}
+.lbr{display:flex;flex-wrap:wrap;gap:5px;}
+.pubrow{display:flex;gap:6px;}
+.pubrow input{flex:1;margin:0;}
+
+/* DPAD */
+.dpad{display:grid;grid-template-columns:repeat(3,34px);grid-template-rows:repeat(3,34px);gap:3px;width:fit-content;margin:7px auto;}
+.dp{width:34px;height:34px;background:var(--bg4);border:1px solid var(--bd);border-radius:6px;color:var(--tx2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;user-select:none;}
+.dp:hover{background:var(--bm);border-color:rgba(59,130,246,.5);color:var(--bl);}
+.dp:active{transform:scale(.92);}
+
+/* LOG */
+.ltb{display:flex;align-items:center;gap:5px;padding:7px 12px;background:var(--bg2);border-bottom:1px solid var(--bd);}
+.fb{font-family:var(--mo);font-size:9px;padding:3px 7px;border-radius:5px;border:1px solid var(--bd);cursor:pointer;background:var(--bg4);color:var(--tx3);transition:all .15s;text-transform:uppercase;letter-spacing:.5px;font-weight:600;}
+.fb.on{border-color:rgba(59,130,246,.5);color:var(--bl);background:var(--bm);}
+.lsrch{flex:1;background:var(--bg4);border:1px solid var(--bd);color:var(--tx);font-family:var(--mo);font-size:10px;padding:4px 8px;border-radius:5px;outline:none;margin:0;}
+.la{flex:1;overflow-y:auto;background:var(--bg);}
+.le{display:flex;align-items:flex-start;gap:8px;padding:4px 12px;border-bottom:1px solid rgba(42,58,92,.3);font-size:10px;line-height:1.5;}
+.le:hover{background:var(--bg3);}
+.lts{color:var(--tx3);white-space:nowrap;flex-shrink:0;font-family:var(--mo);}
+.lv{width:42px;text-align:center;flex-shrink:0;font-size:8.5px;font-weight:700;padding:1px 3px;border-radius:3px;text-transform:uppercase;font-family:var(--mo);}
+.lv.INFO{background:var(--bm);color:var(--bl);}
+.lv.OK{background:var(--gd);color:var(--gn);}
+.lv.WARN{background:var(--adm);color:var(--am);}
+.lv.ERR{background:var(--rm);color:var(--rd);}
+.lv.RX{background:rgba(6,182,212,.12);color:var(--cy);}
+.lv.TX{background:rgba(16,185,129,.12);color:var(--gn);}
+.lmsg{color:var(--tx2);flex:1;word-break:break-all;font-family:var(--mo);}
+.lmsg .hi{color:var(--am);}.lmsg .tp{color:var(--pu);}
+.ltrim{font-family:var(--mo);font-size:9px;color:var(--am);padding:3px 12px;background:var(--adm);border-bottom:1px solid rgba(245,158,11,.2);}
+
+/* SERIAL */
+.stb{display:flex;gap:6px;padding:7px 12px;background:var(--bg2);border-bottom:1px solid var(--bd);align-items:center;}
+#serialArea{flex:1;overflow-y:auto;padding:8px 14px;background:#030608;font-family:var(--mo);font-size:11px;}
+.sl{color:#00e600;line-height:1.7;white-space:pre-wrap;word-break:break-all;}
+.sl.e{color:#ef4444;}.sl.w{color:#f59e0b;}
+
+/* STATUS BAR */
+#statusbar{background:var(--bg2);border-top:1px solid var(--bd);padding:3px 14px;display:flex;gap:14px;align-items:center;font-family:var(--mo);font-size:9px;color:var(--tx3);flex-shrink:0;}
+.si{display:flex;align-items:center;gap:3px;}
+.si.ok{color:var(--gn);}.si.er{color:var(--rd);}
+
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg2);}
+::-webkit-scrollbar-thumb{background:var(--bd);border-radius:3px;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.pl{animation:blink 1.4s infinite;}
+@keyframes bz{0%,100%{transform:translateX(0)}20%{transform:translateX(-3px)}40%{transform:translateX(3px)}60%{transform:translateX(-2px)}80%{transform:translateX(2px)}}
+.bzing{animation:bz .15s linear 5;}
+
+/* ── RESPONSIVE ── */
+@media(max-width:900px){
+  html,body{height:auto;overflow:auto;}
+  #layout{grid-template-columns:1fr;height:auto;}
+  #sb{overflow-y:visible;max-height:none;}
+  #main{height:auto;min-height:60vh;}
+  .tc.on{display:flex;flex-direction:column;min-height:60vh;}
+  .dash{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))!important;}
+  .cw{grid-column:span 1!important;}
+  #topbar{flex-wrap:wrap;height:auto;padding:6px 12px;gap:6px;}
+  .logo-wrap{flex-wrap:wrap;gap:6px;}
+  .tr{flex-wrap:wrap;gap:6px;}
+  .badge{font-size:8px;}
+}
+@media(max-width:600px){
+  .dash{grid-template-columns:1fr!important;}
+  .dpad{grid-template-columns:repeat(3,42px);grid-template-rows:repeat(3,42px);}
+  .dp{width:42px;height:42px;font-size:17px;}
+  #statusbar{flex-wrap:wrap;gap:6px;}
+  .pub-mode-grp{gap:4px;}
+  .pmb{padding:8px 3px;font-size:8px;}
+  .pmb .pmbico{font-size:16px;}
+  .logo-title{font-size:11px;}
+  .logo-sub{display:none;}
+}
+@media(min-width:901px){
+  html,body{height:100%;overflow:hidden;}
+  #layout{height:calc(100vh - 48px);}
+}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div id="topbar">
+  <img class="logo-img"
+     src="https://jurnudev.github.io/my-assets/logo.png.jpeg">
+      <div class="logo-sub">By · Nova Developer</div>
+    </div>
+    <span class="badge b-board">ESP32 DevKit 30-pin</span>
+    <span id="mqttBadge" class="badge b-err">DISCONNECTED</span>
+  </div>
+  <div class="tr">
+    <button class="theme-btn" id="themeBtnTop" onclick="toggleTheme()">🌙 Dark</button>
+    <span class="dlb">WiFi</span><div id="dWifi" class="dot r"></div>
+    <span class="dlb">MQTT</span><div id="dMqtt" class="dot r"></div>
+    <span class="dlb">DHT</span><div id="dDht" class="dot y pl"></div>
+    <span class="dlb">PUB</span><div id="dPub" class="dot off"></div>
+    <span class="dlb">BUZ</span><div id="dBuz" class="dot off"></div>
+  </div>
+</div>
+
+<div id="layout">
+
+<!-- ═══ SIDEBAR ═══ -->
+<div id="sb">
+
+  <!-- CONNECTION -->
+  <div class="ss">
+    <div class="stt"><span class="icon" style="background:var(--bm);color:var(--bl)">⚙</span>Connection</div>
+    <label>Broker Host / IP</label>
+    <input type="text" id="iHost" value="rail.kls.ac.th">
+    <label>WebSocket Port</label>
+    <input type="number" id="iWsPort" value="9002">
+    <label>TCP Port (อ้างอิง)</label>
+    <input type="number" id="iTcpPort" value="1883">
+    <label>Client ID <span style="color:var(--tx3);font-weight:400">(auto-gen)</span></label>
+    <div style="display:flex;gap:5px;margin-bottom:8px">
+      <input type="text" id="iClientId" style="margin:0;flex:1" readonly>
+      <button class="btn gr" style="padding:5px 9px;font-size:14px" onclick="genId()" title="สร้างใหม่">↻</button>
+    </div>
+    <label>Username (opt.)</label>
+    <input type="text" id="iUser" placeholder="username">
+    <label>Password (opt.)</label>
+    <input type="password" id="iPass" placeholder="password">
+    <div class="trow"><span class="tlb">Auto-reconnect</span><div class="tog on" id="togRC" onclick="this.classList.toggle('on')"></div></div>
+    <button class="btn g fw" id="btnConn" onclick="doConnect()">⬤ Connect</button>
+    <button class="btn r fw" id="btnDisc" onclick="doDisconnect()" style="display:none">✕ Disconnect</button>
+    <div style="display:flex;gap:5px;margin-top:2px">
+      <button class="btn p" style="flex:1;font-size:9px" onclick="saveCfg()">💾 บันทึก Config</button>
+      <button class="btn gr" style="flex:1;font-size:9px" onclick="document.getElementById('fCfg').click()">📂 เปิด Config</button>
+      <input type="file" id="fCfg" accept=".json" style="display:none" onchange="loadCfg(event)">
+    </div>
+  </div>
+
+  <!-- TOPICS -->
+  <div class="ss">
+    <div class="stt"><span class="icon" style="background:var(--pm);color:var(--pu)">📡</span>Topics</div>
+    <label>Subscribe (รับคำสั่ง)</label>
+    <input type="text" id="iSub" value="test/topic">
+    <label>Publish — Sensor1</label>
+    <input type="text" id="iTs1" value="Sensor1">
+    <label>Publish — Temp</label>
+    <input type="text" id="iTt" value="Temp">
+    <label>Publish — Humid</label>
+    <input type="text" id="iTh" value="Humid">
+    <button class="btn b fw" onclick="applyTopics()">↻ Apply Topics</button>
+  </div>
+
+  <!-- SENSOR SIM -->
+  <div class="ss">
+    <div class="stt"><span class="icon" style="background:var(--gd);color:var(--gn)">🌡</span>Sensor Sim — Publish Mode</div>
+
+    <!-- ── 3-mode publish buttons ── -->
+    <div class="pub-mode-grp">
+      <button class="pmb" id="pmRand" onclick="setPubMode('rand')" title="สุ่มส่งค่าทุก 1 วินาที">
+        <span class="pmbico">🎲</span>สุ่ม
+      </button>
+      <button class="pmb" id="pmSlide" onclick="setPubMode('slide')" title="ส่งค่าตามสไลด์ด้านล่าง">
+        <span class="pmbico">🎚</span>สไลด์
+      </button>
+      <button class="pmb active-off" id="pmOff" onclick="setPubMode('off')" title="หยุดการส่งข้อมูล">
+        <span class="pmbico">⏹</span>หยุด
+      </button>
+    </div>
+    <div id="pubModeInfo" style="font-family:var(--mo);font-size:9px;color:var(--tx3);text-align:center;margin-bottom:8px;padding:4px 8px;background:var(--bg4);border-radius:5px;border:1px solid var(--bd)">
+      ⏹ หยุดการส่งข้อมูล
+    </div>
+
+    <label>Temp: <span id="lT" style="color:#f87171;font-size:12px">28.0</span> °C</label>
+    <input type="range" id="rT" min="20" max="50" value="28" oninput="updSensors();onSlideChange()">
+    <label>Humid: <span id="lH" style="color:#60a5fa;font-size:12px">65.0</span> %</label>
+    <input type="range" id="rH" min="30" max="100" value="65" oninput="updSensors();onSlideChange()">
+    <label>ADC GPIO36: <span id="lA" style="color:#fbbf24;font-size:12px">1024</span></label>
+    <input type="range" id="rA" min="0" max="4095" value="1024" oninput="updSensors();onSlideChange()">
+    <div class="gr2">
+      <div class="ga"><div class="gv" style="color:#f87171" id="gT">28.0</div><div class="gu">°C</div><div class="gl">Temp</div></div>
+      <div class="ga"><div class="gv" style="color:#60a5fa" id="gH">65.0</div><div class="gu">%RH</div><div class="gl">Humid</div></div>
+    </div>
+    <div class="trow"><span class="tlb">DHT Noise ±0.3</span><div class="tog on" id="togNT" onclick="this.classList.toggle('on')"></div></div>
+    <div class="trow"><span class="tlb">ADC Noise</span><div class="tog on" id="togNA" onclick="this.classList.toggle('on')"></div></div>
+    <div class="trow"><span class="tlb">DHT Fail (simulate)</span><div class="tog" id="togDF" onclick="this.classList.toggle('on')"></div></div>
+  </div>
+
+  <!-- LED BULBS -->
+  <div class="ss">
+    <div class="stt"><span class="icon" style="background:var(--adm);color:var(--am)">💡</span>LED — A(26) B(25) C(14)</div>
+    <div class="bulbs">
+      <div class="bwrap"><div class="bulb" id="bA"></div><span class="blb">A</span><span class="bst" id="sA">OFF</span></div>
+      <div class="bwrap"><div class="bulb" id="bB"></div><span class="blb">B</span><span class="bst" id="sB">OFF</span></div>
+      <div class="bwrap"><div class="bulb" id="bC"></div><span class="blb">C</span><span class="bst" id="sC">OFF</span></div>
+    </div>
+    <div style="text-align:center;font-family:var(--mo);font-size:9px;color:var(--tx3)">รับจาก <span id="ledTL" style="color:var(--pu)">test/topic</span></div>
+  </div>
+
+  <!-- OLED -->
+  <div class="ss">
+    <div class="stt"><span class="icon" style="background:rgba(0,200,0,.1);color:#00e600">📺</span>OLED 128×64</div>
+    <div class="oled" id="oled">
+      <div class="ol">TP:test/topic PL:_</div>
+      <div class="ol">TP: Sensor1 PL: _</div>
+      <div class="ol">TP: Temp PL: _</div>
+      <div class="ol">TP: Humid PL: _</div>
+    </div>
+  </div>
+
+  <!-- GPIO -->
+  <div class="ss">
+    <div class="stt"><span class="icon" style="background:var(--bm);color:var(--bl)">🔌</span>GPIO State</div>
+    <div style="background:var(--bg4);border:1px solid var(--bd);border-radius:7px;padding:8px">
+      <div style="font-family:var(--mo);font-size:10px;color:var(--bl);text-align:center;margin-bottom:6px;font-weight:700;letter-spacing:1px">ESP32 DevKit V1</div>
+      <div class="gpg" id="gpioDisp"></div>
+    </div>
+  </div>
+
+</div><!-- end sidebar -->
+
+<!-- ═══ MAIN ═══ -->
+<div id="main">
+  <div id="tabbar">
+    <div class="tab on" onclick="swTab('dash',this)">📊 Dashboard</div>
+    <div class="tab" onclick="swTab('act',this)">⚙ Actuators</div>
+    <div class="tab" onclick="swTab('log',this)">📋 Log <span class="tct" id="tcLog">0</span> <span style="font-size:8px;color:var(--am)">/10</span></div>
+    <div class="tab" onclick="swTab('serial',this)">💻 Serial</div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="tc on" id="tab-dash">
+    <div class="dash">
+      <div class="card" id="card-s1">
+        <div class="ch"><span class="ctop" id="dn-s1">Sensor1</span><span id="pb-s1" class="pub-badge pb-off">⏹ OFF</span></div>
+        <div class="cv" id="dv-s1">—</div>
+        <div class="cd">Analog GPIO36 (0–4095)</div>
+        <div class="sbw"><div class="sbf" id="sf-s1" style="width:25%;background:var(--bl)"></div></div>
+        <div class="ctm" id="dt-s1">รอเชื่อมต่อ...</div>
+      </div>
+      <div class="card" id="card-t">
+        <div class="ch"><span class="ctop" id="dn-t">Temp</span><span id="pb-t" class="pub-badge pb-off">⏹ OFF</span></div>
+        <div class="cv" style="color:#f87171" id="dv-t">—</div>
+        <div class="cd">DHT22 Temperature (°C)</div>
+        <div class="sbw"><div class="sbf" id="sf-t" style="width:30%;background:#f87171"></div></div>
+        <div class="ctm" id="dt-t">รอเชื่อมต่อ...</div>
+      </div>
+      <div class="card" id="card-h">
+        <div class="ch"><span class="ctop" id="dn-h">Humid</span><span id="pb-h" class="pub-badge pb-off">⏹ OFF</span></div>
+        <div class="cv" style="color:#60a5fa" id="dv-h">—</div>
+        <div class="cd">DHT22 Humidity (%)</div>
+        <div class="sbw"><div class="sbf" id="sf-h" style="width:65%;background:#60a5fa"></div></div>
+        <div class="ctm" id="dt-h">รอเชื่อมต่อ...</div>
+      </div>
+      <div class="card" id="card-rx">
+        <div class="ch"><span class="ctop" id="dn-rx">test/topic</span><span style="font-size:9px;color:var(--cy);font-family:var(--mo)">↓RX</span></div>
+        <div class="cv" style="color:var(--pu);font-size:18px" id="dv-rx">—</div>
+        <div class="cd">Last command received</div>
+        <div class="ctm" id="dt-rx">รอ...</div>
+      </div>
+      <div class="card cw">
+        <div style="font-family:var(--mo);font-size:9px;color:var(--tx3);margin-bottom:7px;text-transform:uppercase;letter-spacing:1px">💡 LED Control → <span id="subLbl" style="color:var(--pu)">test/topic</span></div>
+        <div class="lbr">
+          <button class="btn a" onclick="pub('AON')">A ON</button>
+          <button class="btn gr" onclick="pub('AOFF')">A OFF</button>
+          <button class="btn b" onclick="pub('BON')">B ON</button>
+          <button class="btn gr" onclick="pub('BOFF')">B OFF</button>
+          <button class="btn g" onclick="pub('CON')">C ON</button>
+          <button class="btn gr" onclick="pub('COFF')">C OFF</button>
+        </div>
+      </div>
+      <div class="card cw">
+        <div style="font-family:var(--mo);font-size:9px;color:var(--tx3);margin-bottom:7px;text-transform:uppercase;letter-spacing:1px">📤 Manual Publish</div>
+        <div class="pubrow">
+          <input type="text" id="mTopic" value="test/topic" placeholder="topic">
+          <input type="text" id="mPayload" placeholder="payload">
+          <button class="btn g" onclick="manPub()">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACTUATORS -->
+  <div class="tc" id="tab-act">
+    <div class="dash" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">
+
+      <!-- SERVO -->
+      <div class="card">
+        <div class="ch"><span class="ctop">Servo</span><span style="font-family:var(--mo);font-size:8px;color:var(--tx3)">sv1 sv2 sv3</span></div>
+        <svg viewBox="0 0 200 148" style="width:100%;display:block">
+          <!-- body -->
+          <rect x="70" y="90" width="60" height="34" rx="5" fill="#1a2236" stroke="#3b82f6" stroke-width="1.5"/>
+          <rect x="82" y="96" width="36" height="8" rx="3" fill="#0d1525"/>
+          <rect x="82" y="108" width="36" height="5" rx="2" fill="#0d1525" opacity=".5"/>
+          <!-- pivot -->
+          <circle cx="100" cy="89" r="9" fill="#2a3a5c" stroke="#3b82f6" stroke-width="1.5"/>
+          <circle cx="100" cy="89" r="4" fill="#3b82f6" opacity=".5"/>
+          <!-- arm group -->
+          <g id="svArm" style="transform-origin:100px 89px;transform:rotate(0deg);transition:transform .5s cubic-bezier(.34,1.56,.64,1)">
+            <rect x="98" y="54" width="4" height="36" rx="2" fill="url(#ag)"/>
+            <circle cx="100" cy="52" r="6" fill="#3b82f6"/>
+            <circle cx="100" cy="52" r="3" fill="#60a5fa"/>
+          </g>
+          <defs>
+            <linearGradient id="ag" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#60a5fa"/>
+              <stop offset="100%" stop-color="#3b82f6"/>
+            </linearGradient>
+          </defs>
+          <!-- degree arc -->
+          <path id="svArc" d="" fill="none" stroke="#3b82f6" stroke-width="1" opacity=".3"/>
+          <text id="svTxt" x="100" y="142" text-anchor="middle" fill="#8899b8" font-family="JetBrains Mono,monospace" font-size="12">90°</text>
+        </svg>
+        <div style="display:flex;gap:5px;margin-top:6px">
+          <button class="btn gr" style="flex:1;font-size:9px" onclick="pub('sv=0')">0°</button>
+          <button class="btn b" style="flex:1;font-size:9px" onclick="pub('sv=90')">90°</button>
+          <button class="btn gr" style="flex:1;font-size:9px" onclick="pub('sv=180')">180°</button>
+        </div>
+        <div style="font-family:var(--mo);font-size:9px;color:var(--tx3);margin-top:5px;text-align:center" id="svInfo">sv1=90° sv2=90° sv3=90°</div>
+      </div>
+
+      <!-- MOTOR -->
+      <div class="card">
+        <div class="ch"><span class="ctop">Motor / Robot</span><span style="font-family:var(--mo);font-size:8px;color:var(--tx3)">run(L,R)</span></div>
+        <svg viewBox="0 0 200 140" style="width:100%;display:block">
+          <!-- body -->
+          <rect x="58" y="40" width="84" height="62" rx="9" fill="#1a2236" stroke="#3a4a6c" stroke-width="1.5"/>
+          <!-- left wheel -->
+          <rect id="wL" x="40" y="52" width="18" height="36" rx="5" fill="#2a3a5c" stroke="#3a4a6c" stroke-width="1.5"/>
+          <!-- right wheel -->
+          <rect id="wR" x="142" y="52" width="18" height="36" rx="5" fill="#2a3a5c" stroke="#3a4a6c" stroke-width="1.5"/>
+          <!-- front arrow -->
+          <polygon points="100,26 90,42 110,42" fill="#3a4a6c"/>
+          <text x="100" y="22" text-anchor="middle" fill="#4a5f8a" font-family="JetBrains Mono,monospace" font-size="8">FRONT</text>
+          <!-- circuit lines decoration -->
+          <line x1="70" y1="60" x2="130" y2="60" stroke="#2a3a5c" stroke-width="1"/>
+          <line x1="70" y1="80" x2="130" y2="80" stroke="#2a3a5c" stroke-width="1"/>
+          <circle cx="80" cy="71" r="4" fill="#2a3a5c" stroke="#3a4a6c" stroke-width="1"/>
+          <circle cx="120" cy="71" r="4" fill="#2a3a5c" stroke="#3a4a6c" stroke-width="1"/>
+          <!-- direction arrow -->
+          <polygon id="mArr" points="100,48 88,68 112,68" fill="var(--gn)" opacity="0"/>
+          <!-- speed bars -->
+          <rect id="sbL" x="44" y="72" width="10" height="2" rx="1" fill="#3b82f6"/>
+          <rect id="sbR" x="146" y="72" width="10" height="2" rx="1" fill="#3b82f6"/>
+          <text id="mStat" x="100" y="82" text-anchor="middle" fill="#8899b8" font-family="JetBrains Mono,monospace" font-size="10">STOP</text>
+          <text id="mSpd" x="100" y="96" text-anchor="middle" fill="#4a5f8a" font-family="JetBrains Mono,monospace" font-size="9">L:0 R:0</text>
+        </svg>
+        <div class="dpad">
+          <div></div><div class="dp" onclick="pub('F')">▲</div><div></div>
+          <div class="dp" onclick="pub('L')">◄</div>
+          <div class="dp" onclick="pub('S')" style="background:var(--rm);border-color:rgba(239,68,68,.4);color:var(--rd)">■</div>
+          <div class="dp" onclick="pub('R')">►</div>
+          <div></div><div class="dp" onclick="pub('B')">▼</div><div></div>
+        </div>
+      </div>
+
+      <!-- BUZZER -->
+      <div class="card">
+        <div class="ch"><span class="ctop">Buzzer</span><span style="font-family:var(--mo);font-size:8px;color:var(--tx3)">beep cmd</span></div>
+        <svg id="svgBuzz" viewBox="0 0 200 115" style="width:100%;display:block">
+          <!-- speaker box -->
+          <rect x="68" y="46" width="25" height="24" rx="3" fill="#1a2236" stroke="#3a4a6c" stroke-width="1.5"/>
+          <!-- speaker cone -->
+          <polygon points="93,42 93,74 116,84 116,34" fill="#2a3a5c" stroke="#3a4a6c" stroke-width="1"/>
+          <!-- sound waves -->
+          <circle id="r1" cx="124" cy="58" r="0" fill="none" stroke="#f59e0b" stroke-width="1.5" opacity="0"/>
+          <circle id="r2" cx="124" cy="58" r="0" fill="none" stroke="#f59e0b" stroke-width="1.5" opacity="0"/>
+          <circle id="r3" cx="124" cy="58" r="0" fill="none" stroke="#f59e0b" stroke-width="1.5" opacity="0"/>
+          <!-- buzzer body circle -->
+          <circle cx="56" cy="58" r="14" fill="#1a2236" stroke="#3a4a6c" stroke-width="1.5"/>
+          <circle cx="56" cy="58" r="8" fill="#2a3a5c" stroke="#3a4a6c" stroke-width="1"/>
+          <circle cx="56" cy="58" r="3" fill="#3a4a6c"/>
+          <text id="bzTxt" x="100" y="109" text-anchor="middle" fill="#4a5f8a" font-family="JetBrains Mono,monospace" font-size="10">IDLE</text>
+        </svg>
+        <button class="btn a fw" onclick="pub('beep')">🔔 Beep (700ms)</button>
+        <div style="font-family:var(--mo);font-size:9px;color:var(--tx3);margin:6px 0 4px;text-transform:uppercase;letter-spacing:1px">Custom payload</div>
+        <div class="pubrow">
+          <input type="text" id="bzPayload" value="beep" style="margin:0">
+          <button class="btn a" onclick="pub(document.getElementById('bzPayload').value)">Send</button>
+        </div>
+        <div style="font-family:var(--mo);font-size:9px;color:var(--tx3);margin-top:7px">keywords: <span style="color:var(--am)">beep · BEEP · buzz · BUZZ</span></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- LOG -->
+  <div class="tc" id="tab-log">
+    <div class="ltb">
+      <div style="display:flex;gap:3px">
+        <div class="fb on" onclick="setFlt(this,'ALL')">ALL</div>
+        <div class="fb" onclick="setFlt(this,'TX')">TX</div>
+        <div class="fb" onclick="setFlt(this,'RX')">RX</div>
+        <div class="fb" onclick="setFlt(this,'OK')">OK</div>
+        <div class="fb" onclick="setFlt(this,'WARN')">WARN</div>
+        <div class="fb" onclick="setFlt(this,'ERR')">ERR</div>
+      </div>
+      <input class="lsrch" id="logSrch" placeholder="ค้นหา..." oninput="renderLog()">
+      <span id="logCtr" style="font-family:var(--mo);font-size:9px;color:var(--tx3);white-space:nowrap">0/10</span>
+      <button class="btn gr" style="padding:3px 8px;font-size:9px" onclick="clearLog()">Clear</button>
+      <button class="btn gr" style="padding:3px 8px;font-size:9px" onclick="exportLog()">Export</button>
+    </div>
+    <div id="logTrim" style="display:none" class="ltrim">⚠ เกิน 10 — ตัดบรรทัดเก่าออกแล้ว</div>
+    <div class="la" id="logArea"></div>
+  </div>
+
+  <!-- SERIAL -->
+  <div class="tc" id="tab-serial">
+    <div class="stb">
+      <span style="font-family:var(--mo);font-size:9px;color:var(--tx3);text-transform:uppercase;letter-spacing:1px">Baud: 115200</span>
+      <button class="btn gr" style="padding:3px 8px;font-size:9px" onclick="document.getElementById('serialArea').innerHTML=''">Clear</button>
+      <div class="trow" style="margin:0;gap:5px"><span class="tlb" style="color:var(--tx2)">Autoscroll</span><div class="tog on" id="togSAS" onclick="this.classList.toggle('on')"></div></div>
+    </div>
+    <div id="serialArea"></div>
+  </div>
+
+  <div id="statusbar">
+    <div class="si" id="sbW">● WiFi: SIM</div>
+    <div class="si" id="sbM">● MQTT: —</div>
+    <div class="si" id="sbIP">IP: —</div>
+    <div class="si" id="sbMAC">MAC: —</div>
+    <div class="si" id="sbUp">Uptime: 0s</div>
+    <div class="si" id="sbMsg" style="margin-left:auto">Msgs: 0</div>
+  </div>
+</div><!-- main -->
+</div><!-- layout -->
+
+<script>
+
+let client = null;
+let REAL_HOST = "rail.kls.ac.th"; 
+let DISPLAY_HOST = "NRJ.dev";  // 👁️ โชว์ในหน้าเว็บ
+/* ── State ── */
+let connected=false, msgCount=0;
+let logEntries=[], logFilter='ALL';
+let startTime=Date.now(), pubTimer=null;
+let pubMode='off'; // 'rand' | 'slide' | 'off'
+const MAX_LOG=10;
+const state={leds:{A:false,B:false,C:false},motor:{L:0,R:0},servo:90,pay:{sub:'_',s1:'_',t:'_',h:'_'}};
+const GPIO_PINS=[
+  {pin:'GPIO26',name:'LED_A',t:'out'},{pin:'GPIO25',name:'LED_B',t:'out'},
+  {pin:'GPIO14',name:'LED_C',t:'out'},{pin:'GPIO23',name:'DHT22',t:'in'},
+  {pin:'GPIO36',name:'SENSOR',t:'adc'},{pin:'GPIO21',name:'SDA',t:'i2c'},
+  {pin:'GPIO22',name:'SCL',t:'i2c'}
+];
+
+/* ── genId (same pattern as RAIL Dashboard) ── */
+function genId(){
+  const id = 'esp32_'+DISPLAY_HOST+'_'+Math.random().toString(36).substring(2,6);
+  document.getElementById('iClientId').value=id;
+  const h=()=>Math.floor(Math.random()*256).toString(16).padStart(2,'0').toUpperCase();
+  document.getElementById('sbMAC').textContent='MAC: '+[h(),h(),h(),h(),h(),h()].join(':');
+}
+
+/* ── Init ── */
+function init(){
+  genId();
+
+  // บังคับให้ input แสดงโดเมนที่ต้องการ
+  document.getElementById('iHost').value = DISPLAY_HOST;
+
+  renderGPIO(); 
+  updSensors(); 
+  updOLED(); 
+  drawServo(90); 
+  drawMotor(0,0,'STOP');
+
+  spr('\n=== ESP32 System Starting ===');
+  spr('DHT22 sensor initialized on GPIO23');
+  spr('Analog sensor initialized on GPIO36');
+  spr('OLED SSD1306 found at 0x3C');
+  spr('=== Setup Complete ===');
+
+  setInterval(()=>{
+    document.getElementById('sbUp').textContent='Uptime: '+Math.floor((Date.now()-startTime)/1000)+'s';
+  },1000);
+}
+
+function swTab(id,el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('.tc').forEach(t=>t.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('tab-'+id).classList.add('on');
+}
+
+/* ── MQTT Connect (same URL pattern as RAIL Dashboard) ── */
+function doConnect(){
+
+  const inputHost = document.getElementById('iHost').value.trim();
+  const p = document.getElementById('iWsPort').value.trim();
+  const c = document.getElementById('iClientId').value.trim();
+  const user = document.getElementById('iUser').value.trim();
+  const pass = document.getElementById('iPass').value.trim();
+  const autoRC = document.getElementById('togRC').classList.contains('on');
+
+  // จุดที่ 1: map domain
+  const b = (inputHost === DISPLAY_HOST) ? REAL_HOST : inputHost;
+
+  // จุดที่ 2: แยก real / fake URL
+  const realUrl = `wss://${b}:${p}/mqtt`;
+  const fakeUrl = `wss://${DISPLAY_HOST}:${p}/mqtt`;
+
+  // จุดที่ 3: log ให้โชว์ fake
+  addLog('INFO','Connecting → ' + fakeUrl);
+  spr('Connecting: ' + fakeUrl + ' [' + c + ']');
+
+  const opts = {
+    clientId: c,
+    clean: true,
+    connectTimeout: 10000,
+    keepalive: 60,
+    reconnectPeriod: autoRC ? 3000 : 0
+  };
+  if(user) opts.username = user;
+  if(pass) opts.password = pass;
+
+  try{
+    if(client){ client.end(true); }
+
+    // จุดที่ 4: connect ของจริง
+    client = mqtt.connect(realUrl, opts);
+
+  }catch(e){
+    addLog('ERR', e.message);
+    spr('ERROR: ' + e.message, 'e');
+    return;
+  }
+
+  client.on('connect',()=>{
+    connected=true;
+    const sub=document.getElementById('iSub').value;
+    client.subscribe(sub,(err)=>{
+      if(!err){addLog('OK','Subscribed: '+sub);spr('Subscribed: '+sub);}
+      else{addLog('ERR','Subscribe failed: '+err.message);}
+    });
+    setConn(true);
+    addLog('OK','MQTT Connected!');
+    spr('MQTT Connected!');
+    if(pubMode!=='off') startPub();
+  });
+
+  client.on('message',(topic,payload)=>{
+    const msg=payload.toString();
+    msgCount++;
+    addLog('RX','['+topic+'] '+msg);
+    spr('RX ['+topic+'] '+msg);
+    handleCmd(msg);
+    state.pay.sub=msg;
+    updCard('rx',msg);
+    updOLED();
+    document.getElementById('sbMsg').textContent='Msgs: '+msgCount;
+  });
+
+  client.on('error',err=>{
+    addLog('ERR',err.message||'Connection error');
+    spr('ERROR: '+(err.message||'connection error'),'e');
+  });
+
+  client.on('close',()=>{
+    if(connected){
+      connected=false;
+      setConn(false);
+      stopPub();
+      addLog('WARN','Connection closed');
+    }
+  });
+
+  client.on('reconnect',()=>{addLog('WARN','Reconnecting...');});
+  client.on('offline',()=>{addLog('WARN','Client offline');});
+}
+
+function doDisconnect(){
+  if(client){client.end(true);client=null;}
+  connected=false;setConn(false);stopPub();addLog('INFO','Disconnected by user');
+}
+
+function setConn(on){
+  document.getElementById('dMqtt').className='dot '+(on?'g':'r');
+  document.getElementById('dWifi').className='dot '+(on?'g':'y');
+  const b=document.getElementById('mqttBadge');
+  b.className='badge '+(on?'b-ok':'b-err');
+  b.textContent=on?'CONNECTED':'DISCONNECTED';
+  document.getElementById('btnConn').style.display=on?'none':'';
+  document.getElementById('btnDisc').style.display=on?'':'none';
+  document.getElementById('sbIP').textContent=on?'IP: 192.168.1.100':'IP: —';
+  const s=document.getElementById('sbM');
+  s.textContent='● MQTT: '+(on?'CONNECTED':'—');
+  s.className='si '+(on?'ok':'');
+  renderGPIO();
+}
+
+/* ── Auto-publish every 1s ── */
+function startPub(){
+  stopPub();
+  if(pubMode==='off')return;
+  pubTimer=setInterval(pubSensors,1000);
+}
+function stopPub(){if(pubTimer){clearInterval(pubTimer);pubTimer=null;}document.getElementById('dPub').className='dot off';}
+
+/* ── Publish mode control ── */
+function setPubMode(mode){
+  pubMode=mode;
+  const labels={rand:'🎲 สุ่มส่งค่า ทุก 1 วินาที',slide:'🎚 ส่งตามสไลด์ เมื่อเลื่อน',off:'⏹ หยุดการส่งข้อมูล'};
+  document.getElementById('pubModeInfo').textContent=labels[mode];
+  ['rand','slide','off'].forEach(m=>{
+    const btn=document.getElementById('pm'+m.charAt(0).toUpperCase()+m.slice(1));
+    if(btn){btn.className='pmb'+(m===mode?' active-'+m:'');}
+  });
+  // update dashboard badges
+  const bdg={rand:{cls:'pb-rand',txt:'🎲 RAND'},slide:{cls:'pb-slide',txt:'🎚 SLIDE'},off:{cls:'pb-off',txt:'⏹ OFF'}};
+  ['s1','t','h'].forEach(k=>{
+    const el=document.getElementById('pb-'+k);
+    if(el){el.className='pub-badge '+bdg[mode].cls;el.textContent=bdg[mode].txt;}
+  });
+  stopPub();
+  if(connected&&mode!=='off') startPub();
+  addLog('INFO','Pub mode → '+mode.toUpperCase());
+}
+
+/* ── Slide mode: publish immediately when slider moves ── */
+function onSlideChange(){
+  if(!connected||!client||pubMode!=='slide')return;
+  pubSensors();
+}
+
+function pubSensors(){
+  if(!connected||!client)return;
+  const pd=document.getElementById('dPub');
+  pd.className='dot g';setTimeout(()=>{pd.className='dot off';},200);
+
+  const dhtFail=document.getElementById('togDF').classList.contains('on');
+  const nt=document.getElementById('togNT').classList.contains('on');
+  const na=document.getElementById('togNA').classList.contains('on');
+  const isRand=pubMode==='rand';
+
+  if(dhtFail){
+    spr('Failed to read from DHT22 sensor!','e');
+    document.getElementById('dDht').className='dot r';
+  }else{
+    document.getElementById('dDht').className='dot g';
+    const tRaw=parseFloat(document.getElementById('rT').value);
+    const hRaw=parseFloat(document.getElementById('rH').value);
+    // rand mode adds noise; slide mode sends exact slider value
+    const t=(isRand&&nt?tRaw+(Math.random()-.5)*.6:isRand?tRaw+(Math.random()-.5)*.2:tRaw).toFixed(1);
+    const h=(isRand&&nt?hRaw+(Math.random()-.5)*1.0:isRand?hRaw+(Math.random()-.5)*.3:hRaw).toFixed(1);
+    const tt=document.getElementById('iTt').value;
+    const ht=document.getElementById('iTh').value;
+    client.publish(tt,t);
+    state.pay.t=t+'C';msgCount++;
+    addLog('TX','['+tt+'] '+t+'°C');spr('Published ['+tt+'] : '+t+'C');
+    updCard('t',t+'°C');
+    document.getElementById('sf-t').style.width=Math.max(0,Math.min(100,((parseFloat(t)-20)/30*100)))+'%';
+    client.publish(ht,h);
+    state.pay.h=h+'%';msgCount++;
+    addLog('TX','['+ht+'] '+h+'%');spr('Published ['+ht+'] : '+h+'%');
+    updCard('h',h+'%');
+    document.getElementById('sf-h').style.width=Math.max(0,Math.min(100,parseFloat(h)))+'%';
+  }
+
+  const aRaw=parseInt(document.getElementById('rA').value);
+  const a=isRand&&na?Math.max(0,Math.min(4095,aRaw+Math.floor((Math.random()-.5)*40))):aRaw;
+  const st=document.getElementById('iTs1').value;
+  client.publish(st,String(a));
+  state.pay.s1=String(a);msgCount++;
+  addLog('TX','['+st+'] '+a);spr('Published ['+st+'] : '+a);
+  updCard('s1',String(a));
+  document.getElementById('sf-s1').style.width=(a/4095*100).toFixed(1)+'%';
+
+  updOLED();
+  document.getElementById('sbMsg').textContent='Msgs: '+msgCount;
+  spr('LED Status: A='+(state.leds.A?'ON':'OFF')+' B='+(state.leds.B?'ON':'OFF')+' C='+(state.leds.C?'ON':'OFF'));
+}
+
+/* ── Commands ── */
+function handleCmd(cmd){
+  const lm={AON:['A',true],AOFF:['A',false],BON:['B',true],BOFF:['B',false],CON:['C',true],COFF:['C',false]};
+  if(lm[cmd]){state.leds[lm[cmd][0]]=lm[cmd][1];updBulbs();renderGPIO();}
+  const mm={F:[50,50],B:[-50,-50],L:[-50,50],R:[50,-50],S:[0,0]};
+  if(mm[cmd]){
+    const[L,R]=mm[cmd];state.motor.L=L;state.motor.R=R;
+    const lb={F:'FORWARD',B:'BACKWARD',L:'TURN L',R:'TURN R',S:'STOP'};
+    drawMotor(L,R,lb[cmd]);spr('run('+L+','+R+') — '+lb[cmd]);
+  }
+  const sv={'sv=0':0,'sv=90':90,'sv=180':180};
+  if(sv[cmd]!==undefined){
+    state.servo=sv[cmd];drawServo(sv[cmd]);
+    document.getElementById('svInfo').textContent='sv1='+sv[cmd]+'° sv2='+sv[cmd]+'° sv3='+sv[cmd]+'°';
+    spr('sv1('+sv[cmd]+') sv2('+sv[cmd]+') sv3('+sv[cmd]+')');
+  }
+  if(/beep|buzz/i.test(cmd)){triggerBuzzer();spr('beep(); delay(700);');}
+  spr('controlLED("'+cmd+'")');
+}
+
+/* ── Servo SVG ── */
+function drawServo(angle){
+  document.getElementById('svArm').style.transform='rotate('+(angle-90)+'deg)';
+  document.getElementById('svTxt').textContent=angle+'°';
+  // arc
+  const cx=100,cy=89,r=38;
+  const startA=(-90)*Math.PI/180;
+  const endA=(angle-90-90)*Math.PI/180;
+  const x1=cx+r*Math.cos(startA);
+  const y1=cy+r*Math.sin(startA);
+  const x2=cx+r*Math.cos(endA);
+  const y2=cy+r*Math.sin(endA);
+  const large=angle>90?1:0;
+  if(angle!==90)document.getElementById('svArc').setAttribute('d','M '+x1+' '+y1+' A '+r+' '+r+' 0 '+large+' '+(angle>90?1:0)+' '+x2+' '+y2);
+  else document.getElementById('svArc').setAttribute('d','');
+}
+
+/* ── Motor SVG ── */
+function drawMotor(L,R,label){
+  const wc=v=>v>0?'#10b981':v<0?'#ef4444':'#2a3a5c';
+  const sc=v=>v>0?'rgba(16,185,129,.4)':v<0?'rgba(239,68,68,.4)':'#3a4a6c';
+  document.getElementById('wL').setAttribute('fill',wc(L));
+  document.getElementById('wL').setAttribute('stroke',sc(L));
+  document.getElementById('wR').setAttribute('fill',wc(R));
+  document.getElementById('wR').setAttribute('stroke',sc(R));
+  document.getElementById('mStat').textContent=label||'STOP';
+  document.getElementById('mSpd').textContent='L:'+L+' R:'+R;
+  const bh=v=>Math.max(2,Math.abs(v)/50*20);
+  const sL=document.getElementById('sbL'),sR=document.getElementById('sbR');
+  sL.setAttribute('height',bh(L));sL.setAttribute('y',72-bh(L));sL.setAttribute('fill',wc(L)==='#2a3a5c'?'#3a4a6c':wc(L));
+  sR.setAttribute('height',bh(R));sR.setAttribute('y',72-bh(R));sR.setAttribute('fill',wc(R)==='#2a3a5c'?'#3a4a6c':wc(R));
+  const arr=document.getElementById('mArr');
+  if(L===0&&R===0){arr.setAttribute('opacity','0');return;}
+  arr.setAttribute('opacity','1');
+  let pts='100,48 88,68 112,68',col='#10b981';
+  if(L<0&&R<0){pts='100,68 88,48 112,48';col='#ef4444';}
+  else if(L<0&&R>0){pts='85,56 105,46 105,66';col='#3b82f6';}
+  else if(L>0&&R<0){pts='115,56 95,46 95,66';col='#3b82f6';}
+  arr.setAttribute('points',pts);arr.setAttribute('fill',col);
+}
+
+/* ── Buzzer ── */
+function triggerBuzzer(){
+  const d=document.getElementById('dBuz'),t=document.getElementById('bzTxt');
+  const svg=document.getElementById('svgBuzz');
+  d.className='dot y';t.textContent='BEEPING!';t.setAttribute('fill','#f59e0b');
+  svg.classList.add('bzing');
+  ['r1','r2','r3'].forEach((id,i)=>{
+    const el=document.getElementById(id);
+    setTimeout(()=>{
+      let r=6,op=0.9;
+      const iv=setInterval(()=>{
+        r+=2.5;op-=0.07;
+        el.setAttribute('r',r);el.setAttribute('opacity',Math.max(0,op));
+        if(op<=0){clearInterval(iv);el.setAttribute('r',0);el.setAttribute('opacity',0);}
+      },30);
+    },i*160);
+  });
+  try{
+    const ctx=new(window.AudioContext||window.webkitAudioContext)();
+    const o=ctx.createOscillator(),g=ctx.createGain();
+    o.connect(g);g.connect(ctx.destination);
+    o.frequency.value=2000;g.gain.value=0.12;o.start();o.stop(ctx.currentTime+0.3);
+  }catch(_){}
+  setTimeout(()=>{d.className='dot off';t.textContent='IDLE';t.setAttribute('fill','#4a5f8a');svg.classList.remove('bzing');},800);
+}
+
+/* ── Publish helpers ── */
+function pub(cmd){
+  if(!connected||!client){addLog('WARN','Not connected');return;}
+  const topic=document.getElementById('iSub').value;
+  client.publish(topic,cmd);msgCount++;
+  addLog('TX','['+topic+'] '+cmd);
+}
+function manPub(){
+  const t=document.getElementById('mTopic').value.trim();
+  const p=document.getElementById('mPayload').value.trim();
+  if(!t||!p)return;
+  if(!connected||!client){addLog('WARN','Not connected');return;}
+  client.publish(t,p);msgCount++;addLog('TX','['+t+'] '+p);
+}
+
+/* ── Topics ── */
+function applyTopics(){
+  const sub=document.getElementById('iSub').value;
+  document.getElementById('dn-rx').textContent=sub;
+  document.getElementById('subLbl').textContent=sub;
+  document.getElementById('ledTL').textContent=sub;
+  document.getElementById('mTopic').value=sub;
+  document.getElementById('dn-s1').textContent=document.getElementById('iTs1').value;
+  document.getElementById('dn-t').textContent=document.getElementById('iTt').value;
+  document.getElementById('dn-h').textContent=document.getElementById('iTh').value;
+  if(connected&&client)client.subscribe(sub);
+  addLog('INFO','Topics applied');updOLED();
+}
+
+/* ── UI helpers ── */
+function updCard(k,v){
+  const ve=document.getElementById('dv-'+k);
+  const te=document.getElementById('dt-'+k);
+  const ce=document.getElementById('card-'+k);
+  if(ve)ve.textContent=v;
+  if(te)te.textContent=new Date().toLocaleTimeString('th-TH',{hour12:false});
+  if(ce){ce.classList.add('fl');setTimeout(()=>ce.classList.remove('fl'),500);}
+}
+function updSensors(){
+  const t=parseFloat(document.getElementById('rT').value).toFixed(1);
+  const h=parseFloat(document.getElementById('rH').value).toFixed(1);
+  const a=parseInt(document.getElementById('rA').value);
+  document.getElementById('lT').textContent=t;document.getElementById('gT').textContent=t;
+  document.getElementById('lH').textContent=h;document.getElementById('gH').textContent=h;
+  document.getElementById('lA').textContent=a;
+}
+function updBulbs(){
+  const m={A:{cls:'oa',col:'#fbbf24'},B:{cls:'ob',col:'#60a5fa'},C:{cls:'oc',col:'#4ade80'}};
+  ['A','B','C'].forEach(ch=>{
+    const b=document.getElementById('b'+ch),s=document.getElementById('s'+ch);
+    if(state.leds[ch]){b.className='bulb '+m[ch].cls;s.textContent='ON';s.style.color=m[ch].col;}
+    else{b.className='bulb';s.textContent='OFF';s.style.color='';}
+  });
+}
+function updOLED(){
+  const p=state.pay;
+  document.getElementById('oled').innerHTML=[
+    'TP:'+document.getElementById('iSub').value+' PL:'+p.sub,
+    'TP: '+document.getElementById('iTs1').value+' PL: '+p.s1,
+    'TP: '+document.getElementById('iTt').value+' PL: '+p.t,
+    'TP: '+document.getElementById('iTh').value+' PL: '+p.h
+  ].map(l=>'<div class="ol">'+l+'</div>').join('');
+}
+function renderGPIO(){
+  const st={GPIO26:state.leds.A,GPIO25:state.leds.B,GPIO14:state.leds.C,GPIO23:true,GPIO36:true,GPIO21:connected,GPIO22:connected};
+  document.getElementById('gpioDisp').innerHTML=GPIO_PINS.map(g=>{
+    const adc=g.t==='adc',on=st[g.pin]||false;
+    const val=adc?parseInt(document.getElementById('rA').value):(on?'HIGH':'LOW');
+    return '<div class="pin"><div class="pdot '+(adc?'adc':on?'h':'')+'"></div><span class="pn">'+g.pin+'<br><span style="color:#2a3a5c">'+g.name+'</span></span><span class="pv">'+val+'</span></div>';
+  }).join('');
+}
+
+/* ── Serial ── */
+function spr(msg,type=''){
+  const el=document.getElementById('serialArea');
+  if(!el)return;
+  const ts=new Date().toLocaleTimeString('th-TH',{hour12:false});
+  const d=document.createElement('div');
+  d.className='sl '+type;d.textContent='['+ts+'] '+msg;
+  el.appendChild(d);
+  while(el.children.length>200)el.removeChild(el.firstChild);
+  const tog=document.getElementById('togSAS');
+  if(tog&&tog.classList.contains('on'))el.scrollTop=el.scrollHeight;
+}
+
+/* ── Log (max 10) ── */
+function addLog(level,msg){
+  const ts=new Date().toLocaleTimeString('th-TH',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const ms=('000'+(Date.now()%1000)).slice(-3);
+  logEntries.push({ts:ts+'.'+ms,level,msg});
+  let trimmed=false;
+  while(logEntries.length>MAX_LOG){logEntries.shift();trimmed=true;}
+  document.getElementById('logTrim').style.display=trimmed?'':'none';
+  document.getElementById('tcLog').textContent=logEntries.length;
+  document.getElementById('logCtr').textContent=logEntries.length+'/'+MAX_LOG;
+  renderLog();
+}
+function renderLog(){
+  const q=document.getElementById('logSrch').value.toLowerCase();
+  const fil=logEntries.filter(e=>(logFilter==='ALL'||e.level===logFilter)&&(!q||e.msg.toLowerCase().includes(q)));
+  document.getElementById('logArea').innerHTML=fil.length
+    ?fil.map(e=>{
+        const mh=e.msg.replace(/\[([^\]]+)\]/g,'[<span class="tp">$1</span>]').replace(/(\d+\.\d+)/g,'<span class="hi">$1</span>');
+        return '<div class="le"><span class="lts">'+e.ts+'</span><span class="lv '+e.level+'">'+e.level+'</span><span class="lmsg">'+mh+'</span></div>';
+      }).join('')
+    :'<div style="padding:20px;text-align:center;font-family:var(--mo);font-size:11px;color:var(--tx3)">ไม่มีรายการ</div>';
+}
+function setFlt(btn,f){document.querySelectorAll('.fb').forEach(b=>b.classList.remove('on'));btn.classList.add('on');logFilter=f;renderLog();}
+function clearLog(){logEntries=[];document.getElementById('logArea').innerHTML='';document.getElementById('tcLog').textContent='0';document.getElementById('logCtr').textContent='0/'+MAX_LOG;document.getElementById('logTrim').style.display='none';}
+function exportLog(){const a=document.createElement('a');a.href='data:text/plain;charset=utf-8,'+encodeURIComponent(logEntries.map(e=>e.ts+' ['+e.level+'] '+e.msg).join('\n'));a.download='esp32_log.txt';a.click();}
+
+/* ── Config ── */
+function getCfg(){
+  return{_v:'3.1',_at:new Date().toISOString(),
+    host:document.getElementById('iHost').value,wsPort:document.getElementById('iWsPort').value,
+    tcpPort:document.getElementById('iTcpPort').value,clientId:document.getElementById('iClientId').value,
+    user:document.getElementById('iUser').value,subTopic:document.getElementById('iSub').value,
+    ts1:document.getElementById('iTs1').value,tt:document.getElementById('iTt').value,th:document.getElementById('iTh').value,
+    rT:document.getElementById('rT').value,rH:document.getElementById('rH').value,rA:document.getElementById('rA').value,
+    dhtNoise:document.getElementById('togNT').classList.contains('on'),
+    adcNoise:document.getElementById('togNA').classList.contains('on'),
+    dhtFail:document.getElementById('togDF').classList.contains('on'),
+    autoRC:document.getElementById('togRC').classList.contains('on')};
+}
+function saveCfg(){
+  const a=document.createElement('a');
+  a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(getCfg(),null,2));
+  a.download='esp32_sim_config.json';a.click();addLog('OK','Config saved');
+}
+function loadCfg(ev){
+  const f=ev.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const c=JSON.parse(e.target.result);
+      const sv=(id,v)=>{if(v!==undefined){const el=document.getElementById(id);if(el)el.value=v;}};
+      const st=(id,v)=>{if(typeof v!='undefined'){const el=document.getElementById(id);if(el){v?el.classList.add('on'):el.classList.remove('on');}}};
+      sv('iHost',c.host);sv('iWsPort',c.wsPort);sv('iTcpPort',c.tcpPort);sv('iClientId',c.clientId);
+      sv('iUser',c.user);sv('iSub',c.subTopic);sv('iTs1',c.ts1);sv('iTt',c.tt);sv('iTh',c.th);
+      sv('rT',c.rT);sv('rH',c.rH);sv('rA',c.rA);
+      st('togNT',c.dhtNoise);st('togNA',c.adcNoise);st('togDF',c.dhtFail);st('togRC',c.autoRC);
+      applyTopics();updSensors();updOLED();addLog('OK','Config loaded: '+f.name);
+    }catch(err){addLog('ERR','Parse error: '+err.message);}
+  };
+  r.readAsText(f);ev.target.value='';
+}
+
+/* ── Theme toggle ── */
+function toggleTheme(){
+  const isLight=document.body.classList.toggle('light');
+  const btn=document.getElementById('themeBtnTop');
+  if(btn){btn.textContent=isLight?'☀ Light':'🌙 Dark';}
+  addLog('INFO','Theme → '+(isLight?'LIGHT':'DARK'));
+}
+
+init();
+</script>
+</body>
+</html>
